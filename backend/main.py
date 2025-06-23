@@ -1,18 +1,20 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine
+from pydantic import BaseModel
+from models import Base, Student
 
-DATABASE_URL = "sqlite+aiosqlite:///./test.db"
-engine = create_async_engine(DATABASE_URL, echo=True)   # Create Async Engine
-async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)   # Session Factory
-Base = declarative_base()   # Base Model
+# Database config
+DATABASE_URL = "sqlite:///./test.db"
+engine = create_engine(DATABASE_URL)
+Base.metadata.create_all(bind=engine)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-
-
+# Create FastAPI app
 app = FastAPI()
 
-# Allow CORS for React frontend
+# CORS middleware for frontend communication and authentication?
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,6 +23,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Sample GET endpoint for homepage (optional)
 @app.get("/homepage")
 def get_homepage_data():
     return {
@@ -29,3 +32,60 @@ def get_homepage_data():
         "reviews": ["Amazing platform!", "Helped me choose my path!"],
         "contact_email": "support@careerguidance.com"
     }
+
+
+
+
+
+
+
+
+
+# Create request body model
+class StudentCreate(BaseModel):
+    first_name: str
+    last_name: str
+    grade: str
+    email: str
+    country: str
+    phone: str
+    password: str
+
+@app.post("/register")
+def register_student(student: StudentCreate):   # ✅ Expect full JSON body
+    session = SessionLocal()
+    existing_student = session.query(Student).filter(Student.email == student.email).first()
+
+    if existing_student:
+        session.close()
+        raise HTTPException(status_code=400, detail="Email already registered.")
+
+    new_student = Student(
+        first_name=student.first_name,
+        last_name=student.last_name,
+        grade=student.grade,
+        email=student.email,
+        country=student.country,
+        phone=student.phone,
+        password=student.password  # we will hash it later
+    )
+
+    session.add(new_student)
+    session.commit()
+    session.close()
+
+    return {"message": "Student registered successfully!"}
+
+
+
+
+@app.post("/login")
+def login_student(email: str, password: str):
+    session = SessionLocal()
+    student = session.query(Student).filter(Student.email == email, Student.password == password).first()
+    session.close()
+
+    if student is None:
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+    
+    return {"message": "Login successful", "first_name": student.first_name}
