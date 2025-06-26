@@ -1,7 +1,10 @@
 # models.py
-from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from datetime import datetime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.sql import func
 
 Base = declarative_base()
 
@@ -12,7 +15,7 @@ class Student(Base):
     first_name = Column(String)
     last_name = Column(String)
     grade = Column(String)
-    email = Column(String, unique=True, index=True)
+    email = Column(String, unique=True, index=True) 
     country = Column(String)
     phone = Column(String)
     password = Column(String)  # hashed
@@ -30,6 +33,32 @@ class Admin(Base):
     phone = Column(String)
     password = Column(String)  # hashed
 
-# create DB connection
-engine = create_engine("sqlite:///test.db")
-Base.metadata.create_all(bind=engine)
+
+
+# models.py
+
+# models.py
+
+class CareerTest(Base):
+    __tablename__ = "career_tests"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)
+    description = Column(String, nullable=False)
+    number_of_questions = Column(Integer, default=0)
+    last_updated = Column(DateTime, default=datetime.utcnow)
+
+    questions = relationship("Question", back_populates="test", cascade="all, delete-orphan")
+
+
+class Question(Base):
+    __tablename__ = "questions"
+    id = Column(Integer, primary_key=True, index=True)
+    test_id = Column(Integer, ForeignKey("career_tests.id"))
+    description = Column(String)
+    tag = Column(String)
+
+    test = relationship("CareerTest", back_populates="questions")
+
+
+
+

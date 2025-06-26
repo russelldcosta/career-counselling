@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import List, Optional
+from datetime import datetime
 
 class StudentSchema(BaseModel):
     id: int
@@ -13,3 +15,57 @@ class StudentSchema(BaseModel):
 
     class Config:
         orm_mode = True         #tells pydantic to read data from ORM objects which is my database
+
+
+
+
+
+
+
+
+
+
+
+class QuestionSchema(BaseModel):
+    id: Optional[int]
+    description: str
+    tag: str
+
+    class Config:
+        from_attributes = True
+
+
+class CareerTestSchema(BaseModel):
+    id: int
+    name: str
+    description: str
+    number_of_questions: int
+    questions: List[QuestionSchema]
+    last_updated: datetime
+
+    class Config:
+        from_attributes = True
+
+
+
+class QuestionCreateSchema(BaseModel):
+    description: str
+    tag: str
+
+class CareerTestCreateSchema(BaseModel):
+    name: str
+    description: str
+    number_of_questions: int
+    questions: List[QuestionCreateSchema]
+
+    class Config:
+        from_attributes = True
+
+
+
+class CareerTestUpdateSchema(BaseModel):
+    name: str
+    description: str
+    number_of_questions: int
+    questions: List[QuestionSchema]
+

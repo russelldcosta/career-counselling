@@ -1,17 +1,15 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query, APIRouter, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import create_engine
 from pydantic import BaseModel
-from models import Base, Student, Admin
-from fastapi import Query, APIRouter, Depends
-from schemas import StudentSchema
-
+from models import Base, Student, Admin, CareerTest, Question, datetime
+from schemas import StudentSchema, CareerTestSchema, CareerTestCreateSchema, CareerTestUpdateSchema
 
 # Database config
 DATABASE_URL = "sqlite:///./test.db"
 engine = create_engine(DATABASE_URL)
-Base.metadata.create_all(bind=engine)
+# Base.metadata.create_all(bind=engine)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Create FastAPI app
@@ -154,6 +152,132 @@ def get_all_students(
 
 
 
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# @app.post("/admin/tests/create", response_model=CareerTestSchema)
+# def create_career_test(test_data: CareerTestCreateSchema, db: Session = Depends(get_db)):
+#     new_test = CareerTest(
+#         name=test_data.name,
+#         description=test_data.description,
+#         number_of_questions=test_data.number_of_questions,
+#         last_updated=datetime.utcnow()
+#     )
+
+#     for q in test_data.questions:
+#         question = Question(description=q.description, tag=q.tag)
+#         new_test.questions.append(question)
+
+#     db.add(new_test)
+#     db.commit()
+#     db.refresh(new_test)
+#     return CareerTestSchema.model_validate(new_test, from_attributes=True)
+
+
+
+@app.post("/admin/tests/create", response_model=CareerTestSchema)
+def create_career_test(test: CareerTestCreateSchema, db: Session = Depends(get_db)):
+    new_test = CareerTest(
+        name=test.name,
+        description=test.description,
+        number_of_questions=test.number_of_questions,
+        last_updated=datetime.utcnow()
+    )
+    db.add(new_test)
+    db.commit()
+    db.refresh(new_test)
+
+    # Save questions
+    for q in test.questions:
+        new_question = Question(
+            test_id=new_test.id,
+            description=q.description,
+            tag=q.tag
+        )
+        db.add(new_question)
+
+    db.commit()
+    return CareerTestSchema.model_validate(new_test, from_attributes=True)
+
+
+
+
+
+@app.get("/admin/tests", response_model=list[CareerTestSchema])
+def get_all_tests(db: Session = Depends(get_db)):
+    tests = db.query(CareerTest).all()
+    return [CareerTestSchema.model_validate(t, from_attributes=True) for t in tests]
+
+
+
+
+
+@app.get("/admin/tests/{test_id}", response_model=CareerTestSchema)
+def get_test(test_id: int, db: Session = Depends(get_db)):
+    test = db.query(CareerTest).filter(CareerTest.id == test_id).first()
+    if not test:
+        raise HTTPException(status_code=404, detail="Test not found")
+    return CareerTestSchema.model_validate(test, from_attributes=True) # return CareerTestSchema.model_validate(test)
+
+
+@app.put("/admin/tests/{test_id}/update", response_model=CareerTestSchema)
+def update_career_test(test_id: int, updated_data: CareerTestUpdateSchema, db: Session = Depends(get_db)):
+    test = db.query(CareerTest).filter(CareerTest.id == test_id).first()
+    if not test:
+        raise HTTPException(status_code=404, detail="Test not found")
+
+    # Update test fields
+    test.name = updated_data.name
+    test.description = updated_data.description
+    test.number_of_questions = updated_data.number_of_questions
+    test.last_updated = datetime.utcnow()
+
+    # Clear existing questions
+    test.questions.clear()
+
+    # Add new questions
+    for q in updated_data.questions:
+        question = Question(description=q.description, tag=q.tag)
+        test.questions.append(question)
+
+    db.commit()
+    db.refresh(test)
+    return CareerTestSchema.model_validate(test, from_attributes=True)
+
+
+
+@app.post("/admin/tests/{test_id}/duplicate")
+def duplicate_test(test_id: int, payload: CareerTestUpdateSchema, db: Session = Depends(get_db)):
+    new_test = CareerTest(
+        name=payload.name + " (Copy)",
+        description=payload.description,
+        number_of_questions=payload.number_of_questions,
+        last_updated=datetime.utcnow()
+    )
+    db.add(new_test)
+    db.commit()
+    db.refresh(new_test)
+
+    for q in payload.questions:
+        new_q = Question(description=q.description, tag=q.tag, test_id=new_test.id)
+        db.add(new_q)
+
+    db.commit()
+    return {"message": "New test version created", "new_test_id": new_test.id }
+
+
+
+
+
+
+
+
+
 
 
 
@@ -192,3 +316,25 @@ def update_admin_profile(admin_id: int, data: dict):
     session.commit()
     session.close()
     return {"message": "Admin profile updated successfully"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if __name__ == "__main__":
+    Base.metadata.create_all(bind=engine)
