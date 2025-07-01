@@ -34,7 +34,6 @@ class QuestionSchema(BaseModel):
     class Config:
         from_attributes = True
 
-
 class CareerTestSchema(BaseModel):
     id: int
     name: str
@@ -45,8 +44,6 @@ class CareerTestSchema(BaseModel):
 
     class Config:
         from_attributes = True
-
-
 
 class QuestionCreateSchema(BaseModel):
     description: str
@@ -61,11 +58,35 @@ class CareerTestCreateSchema(BaseModel):
     class Config:
         from_attributes = True
 
-
-
 class CareerTestUpdateSchema(BaseModel):
     name: str
     description: str
     number_of_questions: int
     questions: List[QuestionSchema]
 
+
+
+
+
+
+
+
+
+
+
+
+
+class CareerPageBase(BaseModel):
+    title: str
+    slug: str
+    content: str
+    thumbnail_url: Optional[str] = None
+    riasec_tags: Optional[str] = ""
+
+class CareerPageCreate(CareerPageBase):
+    pass
+
+class CareerPageOut(CareerPageBase):
+    id: int
+    class Config:
+        from_attributes = True

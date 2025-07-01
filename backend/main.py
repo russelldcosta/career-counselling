@@ -1,10 +1,19 @@
-from fastapi import FastAPI, HTTPException, Query, APIRouter, Depends
+from fastapi import FastAPI, HTTPException, Query, APIRouter, Depends, UploadFile, File, Form
+from fastapi.staticfiles import StaticFiles
+import shutil, os
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import create_engine
 from pydantic import BaseModel
-from models import Base, Student, Admin, CareerTest, Question, datetime
-from schemas import StudentSchema, CareerTestSchema, CareerTestCreateSchema, CareerTestUpdateSchema
+from models import Base, Student, Admin, CareerTest, Question, datetime, CareerPage
+from schemas import StudentSchema, CareerTestSchema, CareerTestCreateSchema, CareerTestUpdateSchema, Optional, CareerPageCreate, CareerPageOut
+from crud import create_career_page, get_all_pages, get_page_by_slug
+from typing import List
+from uuid import uuid4
+
+
+
+
 
 # Database config
 DATABASE_URL = "sqlite:///./test.db"
@@ -18,7 +27,7 @@ app = FastAPI()
 # CORS middleware for frontend communication and authentication?
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # replace * with your frontend port if needed
+    allow_origins=["http://localhost:3000"],  # or ["*"] for all
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -317,6 +326,95 @@ def update_admin_profile(admin_id: int, data: dict):
     session.close()
     return {"message": "Admin profile updated successfully"}
 
+
+
+
+
+
+@app.post("/career-pages/upload", response_model=CareerPageOut)
+def create_with_thumbnail(
+    title: str = Form(...),
+    slug: str = Form(...),
+    content: str = Form(...),
+    riasec_tags: str = Form(""),
+    thumbnail: UploadFile = File(None),
+    db: Session = Depends(get_db)
+):
+    thumbnail_url = None
+    if thumbnail:
+        file_ext = os.path.splitext(thumbnail.filename)[-1]
+        file_path = os.path.join(UPLOAD_DIR, f"{slug}{file_ext}")
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(thumbnail.file, buffer)
+        thumbnail_url = f"/uploads/{slug}{file_ext}"
+
+    page = CareerPageCreate(
+        title=title,
+        slug=slug,
+        content=content,
+        riasec_tags=riasec_tags,
+        thumbnail_url=thumbnail_url
+    )
+    return create_career_page(db, page)
+
+
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
+# Create a new career page
+@app.post("/career-pages", response_model=CareerPageOut)
+def create_page(page: CareerPageCreate, db: Session = Depends(get_db)):
+    return create_career_page(db, page)
+
+
+# List all career pages
+@app.get("/career-pages", response_model=List[CareerPageOut])
+def get_all_career_pages(db: Session = Depends(get_db)):
+    return get_all_pages(db)
+
+
+# Get a page by slug (for detail view)
+@app.get("/career-pages/{slug}", response_model=CareerPageOut)
+def get_page(slug: str, db: Session = Depends(get_db)):
+    db_page = get_page_by_slug(db, slug)
+    if not db_page:
+        raise HTTPException(status_code=404, detail="Page not found.")
+    return db_page
+
+@app.put("/career-pages/{slug}/update")
+def update_career_page(
+    slug: str,
+    title: str = Form(...),
+    slug_new: Optional[str] = Form(None),
+    riasec_tags: Optional[str] = Form(None),
+    content: str = Form(...),
+    parent_id: Optional[int] = Form(None),
+    thumbnail: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db)
+):
+    page = db.query(CareerPage).filter(CareerPage.slug == slug).first()
+    if not page:
+        raise HTTPException(status_code=404, detail="Page not found")
+
+    page.title = title
+    page.riasec_tags = riasec_tags
+    page.content = content
+    page.parent_id = parent_id
+
+    if slug_new:
+        page.slug = slug_new
+
+    if thumbnail:
+        filename = f"{uuid4().hex}_{thumbnail.filename}"
+        file_location = f"static/uploads/{filename}"
+        with open(file_location, "wb+") as file_object:
+            file_object.write(thumbnail.file.read())
+        page.thumbnail_url = f"/uploads/{filename}"
+
+    db.commit()
+    db.refresh(page)
+    return page
 
 
 

@@ -1,5 +1,5 @@
 # models.py
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text
 from datetime import datetime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
@@ -35,9 +35,9 @@ class Admin(Base):
 
 
 
-# models.py
 
-# models.py
+
+
 
 class CareerTest(Base):
     __tablename__ = "career_tests"
@@ -49,7 +49,6 @@ class CareerTest(Base):
 
     questions = relationship("Question", back_populates="test", cascade="all, delete-orphan")
 
-
 class Question(Base):
     __tablename__ = "questions"
     id = Column(Integer, primary_key=True, index=True)
@@ -58,6 +57,24 @@ class Question(Base):
     tag = Column(String)
 
     test = relationship("CareerTest", back_populates="questions")
+
+
+
+
+
+
+
+
+class CareerPage(Base):
+    __tablename__ = "career_pages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(200), unique=True, index=True)
+    thumbnail_url = Column(String(500))
+    slug = Column(String(200), unique=True, index=True)
+    content = Column(Text)  # HTML from WYSIWYG
+    riasec_tags = Column(String(20))  # Comma-separated e.g. "R,I"
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 
