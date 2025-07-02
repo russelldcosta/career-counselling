@@ -75,7 +75,8 @@ class CareerPage(Base):
     content = Column(Text)  # HTML from WYSIWYG
     riasec_tags = Column(String(20))  # Comma-separated e.g. "R,I"
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
+    parent_id = Column(Integer, ForeignKey("career_pages.id"), nullable=True)
+    children = relationship("CareerPage", backref="parent", remote_side=[id])
 
 
 

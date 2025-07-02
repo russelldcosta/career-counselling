@@ -82,11 +82,14 @@ class CareerPageBase(BaseModel):
     content: str
     thumbnail_url: Optional[str] = None
     riasec_tags: Optional[str] = ""
+    parent_id : Optional[int]
 
 class CareerPageCreate(CareerPageBase):
+    parent_id : Optional[int]
     pass
 
 class CareerPageOut(CareerPageBase):
     id: int
+    parent_id : Optional[int]
     class Config:
         from_attributes = True

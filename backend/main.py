@@ -329,43 +329,46 @@ def update_admin_profile(admin_id: int, data: dict):
 
 
 
-
-
-@app.post("/career-pages/upload", response_model=CareerPageOut)
-def create_with_thumbnail(
-    title: str = Form(...),
-    slug: str = Form(...),
-    content: str = Form(...),
-    riasec_tags: str = Form(""),
-    thumbnail: UploadFile = File(None),
-    db: Session = Depends(get_db)
-):
-    thumbnail_url = None
-    if thumbnail:
-        file_ext = os.path.splitext(thumbnail.filename)[-1]
-        file_path = os.path.join(UPLOAD_DIR, f"{slug}{file_ext}")
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(thumbnail.file, buffer)
-        thumbnail_url = f"/uploads/{slug}{file_ext}"
-
-    page = CareerPageCreate(
-        title=title,
-        slug=slug,
-        content=content,
-        riasec_tags=riasec_tags,
-        thumbnail_url=thumbnail_url
-    )
-    return create_career_page(db, page)
-
-
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
-# Create a new career page
-@app.post("/career-pages", response_model=CareerPageOut)
-def create_page(page: CareerPageCreate, db: Session = Depends(get_db)):
-    return create_career_page(db, page)
+
+@app.post("/career-pages/upload", response_model=CareerPageOut)
+async def create_page(
+    title: str = Form(...),
+    slug: str = Form(...),
+    content: str = Form(...),
+    riasec_tags: Optional[str] = Form(""),
+    parent_id: Optional[int] = Form(None),
+    thumbnail: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db)
+):
+    thumbnail_url = None
+    if thumbnail:
+        file_location = f"uploads/{thumbnail.filename}"
+        with open(file_location, "wb") as f:
+            f.write(await thumbnail.read())
+        thumbnail_url = f"/{file_location}"
+
+    # ✅ NO CareerPageCreate used here
+    page = CareerPage(
+        title=title,
+        slug=slug,
+        content=content,
+        riasec_tags=riasec_tags,
+        parent_id=parent_id,
+        thumbnail_url=thumbnail_url
+    )
+
+    db.add(page)
+    db.commit()
+    db.refresh(page)
+    return page
+
+
+
+
 
 
 # List all career pages
